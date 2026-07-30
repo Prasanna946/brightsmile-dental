@@ -81,6 +81,13 @@ async function sendWhatsapp(body: AppointmentBody): Promise<boolean> {
       (body.preferredDate ? `*Date:* ${body.preferredDate}\n` : "") +
       (body.message ? `*Notes:* ${body.message}` : "");
 
+    // Build form body manually to preserve + in phone numbers
+    const formBody = [
+      `To=${encodeURIComponent(CLINIC_WHATSAPP)}`,
+      `From=${encodeURIComponent(TWILIO_WHATSAPP_NUMBER)}`,
+      `Body=${encodeURIComponent(msg)}`,
+    ].join("&");
+
     const encoded = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
 
     const res = await fetch(
@@ -91,11 +98,7 @@ async function sendWhatsapp(body: AppointmentBody): Promise<boolean> {
           Authorization: `Basic ${encoded}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({
-          To: CLINIC_WHATSAPP,
-          From: TWILIO_WHATSAPP_NUMBER,
-          Body: msg,
-        }),
+        body: formBody,
       }
     );
 

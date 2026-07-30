@@ -80,6 +80,11 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify(emailParams),
         });
 
+        if (!res.ok) {
+          const errBody = await res.text();
+          console.error("[EmailJS] Failed:", res.status, errBody);
+        }
+
         emailSent = res.ok;
       } catch {
         // Email failed but appointment is still saved

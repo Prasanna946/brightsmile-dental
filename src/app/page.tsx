@@ -488,6 +488,7 @@ function AppointmentSection({
     const e: Partial<FormData> = {};
     if (!form.name.trim()) e.name = "Please enter your name.";
     if (!form.phone.trim()) e.phone = "Please enter your phone number.";
+    else if (!/^\d{10}$/.test(form.phone.trim())) e.phone = "Enter a valid 10-digit Indian number.";
     if (!form.email.trim()) {
       e.email = "Please enter your email.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
@@ -664,14 +665,22 @@ function AppointmentSection({
                     <Label htmlFor="phone">
                       Phone <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="(555) 000-0000"
-                      value={form.phone}
-                      onChange={(e) => updateField("phone", e.target.value)}
-                      className={errors.phone ? "border-red-400" : ""}
-                    />
+                    <div className="flex gap-0">
+                      <span className="inline-flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 text-sm font-medium text-muted-foreground select-none">
+                        +91
+                      </span>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="63818 71589"
+                        value={form.phone}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          updateField("phone", digits);
+                        }}
+                        className={`rounded-l-none ${errors.phone ? "border-red-400" : ""}`}
+                      />
+                    </div>
                     {errors.phone && (
                       <p className="flex items-center gap-1 text-xs text-red-500">
                         <AlertCircle className="h-3 w-3" />

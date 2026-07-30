@@ -101,8 +101,8 @@ const SERVICE_OPTIONS = [
   "Other",
 ];
 
-const CLINIC_PHONE = "+1 (555) 123-4567";
-const CLINIC_PHONE_TEL = "+15551234567";
+const CLINIC_PHONE = "+91 63818 71589";
+const CLINIC_PHONE_TEL = "+916381871589";
 const CLINIC_EMAIL = "hello@brightsmile.dental";
 const CLINIC_ADDRESS = "123 Smile Avenue, Suite 200, San Francisco, CA 94102";
 const CLINIC_HOURS = [

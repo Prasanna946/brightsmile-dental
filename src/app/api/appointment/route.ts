@@ -5,8 +5,10 @@ const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || "";
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
 const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
 
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || "";
-const WHATSAPP_PHONE = process.env.WHATSAPP_PHONE || "916381871589"; // no + sign
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
+const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || ""; // e.g. whatsapp:+14155238886
+const CLINIC_WHATSAPP = process.env.CLINIC_WHATSAPP_NUMBER || "whatsapp:+916381871589";
 
 interface AppointmentBody {
   name: string;
@@ -33,7 +35,9 @@ const isEmailConfigured =
   EMAILJS_TEMPLATE_ID.length > 0 && !EMAILJS_TEMPLATE_ID.includes("YOUR_");
 
 const isWhatsappConfigured =
-  WHATSAPP_API_KEY.length > 0 && !WHATSAPP_API_KEY.includes("YOUR_");
+  TWILIO_ACCOUNT_SID.length > 0 && !TWILIO_ACCOUNT_SID.includes("YOUR_") &&
+  TWILIO_AUTH_TOKEN.length > 0 && !TWILIO_AUTH_TOKEN.includes("YOUR_") &&
+  TWILIO_WHATSAPP_NUMBER.length > 0 && !TWILIO_WHATSAPP_NUMBER.includes("YOUR_");
 
 async function sendEmail(body: AppointmentBody): Promise<boolean> {
   if (!isEmailConfigured) return false;
@@ -77,12 +81,23 @@ async function sendWhatsapp(body: AppointmentBody): Promise<boolean> {
       (body.preferredDate ? `*Date:* ${body.preferredDate}\n` : "") +
       (body.message ? `*Notes:* ${body.message}` : "");
 
-    const url = new URL("https://api.callmebot.com/whatsapp.php");
-    url.searchParams.set("phone", WHATSAPP_PHONE);
-    url.searchParams.set("text", msg);
-    url.searchParams.set("apikey", WHATSAPP_API_KEY);
+    const encoded = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
 
-    const res = await fetch(url.toString(), { method: "GET" });
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${encoded}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          To: CLINIC_WHATSAPP,
+          From: TWILIO_WHATSAPP_NUMBER,
+          Body: msg,
+        }),
+      }
+    );
 
     if (!res.ok) {
       console.error("[WhatsApp] Failed:", res.status, await res.text());

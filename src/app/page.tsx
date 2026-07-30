@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, FormEvent } from "react";
+import { useState, useEffect, useRef, useSyncExternalStore, FormEvent } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1048,12 +1048,24 @@ function Footer() {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
+const emptySubscribe = () => () => {};
+
 export default function HomePage() {
   const appointmentRef = useRef<HTMLDivElement>(null);
+
+  // Client-only: server renders null, client renders full page.
+  // Prevents hydration mismatches from browser extensions (e.g. Grammarly).
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
   const scrollToAppointment = () => {
     appointmentRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  if (!mounted) return null;
 
   return (
     <div className="flex min-h-screen flex-col">

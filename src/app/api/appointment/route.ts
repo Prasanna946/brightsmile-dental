@@ -5,6 +5,11 @@ const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || "";
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
 const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
 
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "";
+const CLINIC_PHONE = process.env.CLINIC_SMS_NUMBER || "+916381871589";
+
 interface AppointmentBody {
   name: string;
   phone: string;
@@ -22,6 +27,86 @@ function validateBody(body: unknown): body is AppointmentBody {
     typeof b.email === "string" && b.email.trim().length > 0 &&
     typeof b.service === "string" && b.service.trim().length > 0
   );
+}
+
+const isEmailConfigured =
+  EMAILJS_PUBLIC_KEY.length > 0 && !EMAILJS_PUBLIC_KEY.includes("YOUR_") &&
+  EMAILJS_SERVICE_ID.length > 0 && !EMAILJS_SERVICE_ID.includes("YOUR_") &&
+  EMAILJS_TEMPLATE_ID.length > 0 && !EMAILJS_TEMPLATE_ID.includes("YOUR_");
+
+const isSmsConfigured =
+  TWILIO_ACCOUNT_SID.length > 0 && !TWILIO_ACCOUNT_SID.includes("YOUR_") &&
+  TWILIO_AUTH_TOKEN.length > 0 && !TWILIO_AUTH_TOKEN.includes("YOUR_") &&
+  TWILIO_PHONE_NUMBER.length > 0 && !TWILIO_PHONE_NUMBER.includes("YOUR_");
+
+async function sendEmail(body: AppointmentBody): Promise<boolean> {
+  if (!isEmailConfigured) return false;
+  try {
+    const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: {
+          from_name: body.name,
+          from_phone: body.phone,
+          from_email: body.email,
+          service: body.service,
+          preferred_date: body.preferredDate || "Not specified",
+          message: body.message || "No additional notes",
+        },
+      }),
+    });
+    if (!res.ok) {
+      console.error("[EmailJS] Failed:", res.status, await res.text());
+    }
+    return res.ok;
+  } catch (err) {
+    console.error("[EmailJS] Error:", err);
+    return false;
+  }
+}
+
+async function sendSms(body: AppointmentBody): Promise<boolean> {
+  if (!isSmsConfigured) return false;
+  try {
+    const smsBody =
+      `BrightSmile Dental\n` +
+      `New: ${body.name} — ${body.service}\n` +
+      `Ph: ${body.phone}\n` +
+      (body.preferredDate ? `Date: ${body.preferredDate}\n` : "") +
+      (body.message ? `Note: ${body.message}` : "");
+
+    const encoded = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
+
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${encoded}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          To: CLINIC_PHONE,
+          From: TWILIO_PHONE_NUMBER,
+          Body: smsBody,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Twilio] Failed:", res.status, errText);
+    }
+
+    return res.ok;
+  } catch (err) {
+    console.error("[Twilio] Error:", err);
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -47,49 +132,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 2. Send email via EmailJS (if configured)
-    let emailSent = false;
-    const isConfigured =
-      EMAILJS_PUBLIC_KEY.length > 0 &&
-      !EMAILJS_PUBLIC_KEY.includes("YOUR_") &&
-      EMAILJS_SERVICE_ID.length > 0 &&
-      !EMAILJS_SERVICE_ID.includes("YOUR_") &&
-      EMAILJS_TEMPLATE_ID.length > 0 &&
-      !EMAILJS_TEMPLATE_ID.includes("YOUR_");
-
-    if (isConfigured) {
-      try {
-        // Call EmailJS REST API directly from the server
-        const emailParams = {
-          service_id: EMAILJS_SERVICE_ID,
-          template_id: EMAILJS_TEMPLATE_ID,
-          user_id: EMAILJS_PUBLIC_KEY,
-          template_params: {
-            from_name: body.name,
-            from_phone: body.phone,
-            from_email: body.email,
-            service: body.service,
-            preferred_date: body.preferredDate || "Not specified",
-            message: body.message || "No additional notes",
-          },
-        };
-
-        const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(emailParams),
-        });
-
-        if (!res.ok) {
-          const errBody = await res.text();
-          console.error("[EmailJS] Failed:", res.status, errBody);
-        }
-
-        emailSent = res.ok;
-      } catch {
-        // Email failed but appointment is still saved
-      }
-    }
+    // 2. Send email + SMS in parallel
+    const [emailSent, smsSent] = await Promise.all([
+      sendEmail(body),
+      sendSms(body),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -100,7 +147,9 @@ export async function POST(req: NextRequest) {
         createdAt: appointment.createdAt,
       },
       emailSent,
-      emailConfigured: isConfigured,
+      smsSent,
+      emailConfigured: isEmailConfigured,
+      smsConfigured: isSmsConfigured,
     });
   } catch {
     return NextResponse.json(
@@ -110,7 +159,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Optional: list recent appointments (for clinic staff)
+// List recent appointments (for clinic staff)
 export async function GET() {
   const appointments = await db.appointment.findMany({
     orderBy: { createdAt: "desc" },

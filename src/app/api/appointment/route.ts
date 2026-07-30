@@ -5,10 +5,8 @@ const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || "";
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
 const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
 
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "";
-const CLINIC_PHONE = process.env.CLINIC_SMS_NUMBER || "+916381871589";
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY || "";
+const WHATSAPP_PHONE = process.env.WHATSAPP_PHONE || "916381871589"; // no + sign
 
 interface AppointmentBody {
   name: string;
@@ -34,10 +32,8 @@ const isEmailConfigured =
   EMAILJS_SERVICE_ID.length > 0 && !EMAILJS_SERVICE_ID.includes("YOUR_") &&
   EMAILJS_TEMPLATE_ID.length > 0 && !EMAILJS_TEMPLATE_ID.includes("YOUR_");
 
-const isSmsConfigured =
-  TWILIO_ACCOUNT_SID.length > 0 && !TWILIO_ACCOUNT_SID.includes("YOUR_") &&
-  TWILIO_AUTH_TOKEN.length > 0 && !TWILIO_AUTH_TOKEN.includes("YOUR_") &&
-  TWILIO_PHONE_NUMBER.length > 0 && !TWILIO_PHONE_NUMBER.includes("YOUR_");
+const isWhatsappConfigured =
+  WHATSAPP_API_KEY.length > 0 && !WHATSAPP_API_KEY.includes("YOUR_");
 
 async function sendEmail(body: AppointmentBody): Promise<boolean> {
   if (!isEmailConfigured) return false;
@@ -69,42 +65,32 @@ async function sendEmail(body: AppointmentBody): Promise<boolean> {
   }
 }
 
-async function sendSms(body: AppointmentBody): Promise<boolean> {
-  if (!isSmsConfigured) return false;
+async function sendWhatsapp(body: AppointmentBody): Promise<boolean> {
+  if (!isWhatsappConfigured) return false;
   try {
-    const smsBody =
-      `BrightSmile Dental\n` +
-      `New: ${body.name} — ${body.service}\n` +
-      `Ph: ${body.phone}\n` +
-      (body.preferredDate ? `Date: ${body.preferredDate}\n` : "") +
-      (body.message ? `Note: ${body.message}` : "");
+    const msg =
+      `🦷 *BrightSmile Dental — New Appointment*\n\n` +
+      `*Patient:* ${body.name}\n` +
+      `*Service:* ${body.service}\n` +
+      `*Phone:* ${body.phone}\n` +
+      `*Email:* ${body.email}\n` +
+      (body.preferredDate ? `*Date:* ${body.preferredDate}\n` : "") +
+      (body.message ? `*Notes:* ${body.message}` : "");
 
-    const encoded = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
+    const url = new URL("https://api.callmebot.com/whatsapp.php");
+    url.searchParams.set("phone", WHATSAPP_PHONE);
+    url.searchParams.set("text", msg);
+    url.searchParams.set("apikey", WHATSAPP_API_KEY);
 
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${encoded}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          To: CLINIC_PHONE,
-          From: TWILIO_PHONE_NUMBER,
-          Body: smsBody,
-        }),
-      }
-    );
+    const res = await fetch(url.toString(), { method: "GET" });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("[Twilio] Failed:", res.status, errText);
+      console.error("[WhatsApp] Failed:", res.status, await res.text());
     }
 
     return res.ok;
   } catch (err) {
-    console.error("[Twilio] Error:", err);
+    console.error("[WhatsApp] Error:", err);
     return false;
   }
 }
@@ -132,10 +118,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 2. Send email + SMS in parallel
-    const [emailSent, smsSent] = await Promise.all([
+    // 2. Send email + WhatsApp in parallel
+    const [emailSent, whatsappSent] = await Promise.all([
       sendEmail(body),
-      sendSms(body),
+      sendWhatsapp(body),
     ]);
 
     return NextResponse.json({
@@ -147,9 +133,9 @@ export async function POST(req: NextRequest) {
         createdAt: appointment.createdAt,
       },
       emailSent,
-      smsSent,
+      whatsappSent,
       emailConfigured: isEmailConfigured,
-      smsConfigured: isSmsConfigured,
+      whatsappConfigured: isWhatsappConfigured,
     });
   } catch {
     return NextResponse.json(

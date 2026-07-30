@@ -672,7 +672,7 @@ function AppointmentSection({
                       <Input
                         id="phone"
                         type="tel"
-                        placeholder="63818 71589"
+                        placeholder="98765 43210"
                         value={form.phone}
                         onChange={(e) => {
                           const digits = e.target.value.replace(/\D/g, "").slice(0, 10);

@@ -112,14 +112,6 @@ const CLINIC_HOURS = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  EmailJS config  (replace these with your own EmailJS credentials) */
-/* ------------------------------------------------------------------ */
-
-const EMAILJS_PUBLIC_KEY = "YOUR_EMAILJS_PUBLIC_KEY";
-const EMAILJS_SERVICE_ID = "YOUR_EMAILJS_SERVICE_ID";
-const EMAILJS_TEMPLATE_ID = "YOUR_EMAILJS_TEMPLATE_ID";
-
-/* ------------------------------------------------------------------ */
 /*  Navbar                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -506,49 +498,53 @@ function AppointmentSection({
     setSubmitting(true);
 
     try {
-      /* ---------------------------------------------------------- */
-      /*  EmailJS integration                                       */
-      /*  If credentials are placeholders, we simulate a success    */
-      /*  so the UI can be previewed. Replace the constants above    */
-      /*  with real EmailJS values to enable actual sending.         */
-      /* ---------------------------------------------------------- */
-      const isPlaceholder =
-        EMAILJS_PUBLIC_KEY.includes("YOUR_") ||
-        EMAILJS_SERVICE_ID.includes("YOUR_") ||
-        EMAILJS_TEMPLATE_ID.includes("YOUR_");
+      const res = await fetch("/api/appointment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          phone: `+91 ${form.phone}`,
+          email: form.email,
+          service: form.service,
+          preferredDate: form.preferredDate || undefined,
+          message: form.message || undefined,
+        }),
+      });
 
-      if (!isPlaceholder) {
-        const w = window as unknown as Record<string, unknown>;
-        const emailjs = w.emailjs as { init: (key: string) => void; send: (service: string, template: string, params: Record<string, string>) => Promise<unknown> };
-        emailjs.init(EMAILJS_PUBLIC_KEY);
-        await emailjs.send(
-          EMAILJS_SERVICE_ID,
-          EMAILJS_TEMPLATE_ID,
-          {
-            from_name: form.name,
-            from_phone: form.phone,
-            from_email: form.email,
-            service: form.service,
-            preferred_date: form.preferredDate,
-            message: form.message,
-          }
-        );
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast({
+          title: "Submission failed",
+          description: data.error || "Please check the form and try again.",
+          variant: "destructive",
+        });
+        return;
       }
 
       setSubmitted(true);
-      toast({
-        title: isPlaceholder
-          ? "Demo mode — email not sent"
-          : "Appointment requested!",
-        description: isPlaceholder
-          ? "Connect EmailJS to enable real email notifications."
-          : `We'll confirm your ${form.service} appointment shortly.`,
-      });
+
+      if (data.emailSent) {
+        toast({
+          title: "Appointment requested!",
+          description: `We'll confirm your ${form.service} appointment shortly.`,
+        });
+      } else if (data.emailConfigured) {
+        toast({
+          title: "Appointment saved!",
+          description: "Email delivery failed, but we have your details. We'll call you to confirm.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Appointment saved!",
+          description: "We'll contact you shortly to confirm your " + form.service + " appointment.",
+        });
+      }
     } catch {
       toast({
         title: "Something went wrong",
-        description:
-          "Please try again or call us directly.",
+        description: "Please try again or call us directly.",
         variant: "destructive",
       });
     } finally {

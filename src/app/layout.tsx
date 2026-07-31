@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://brightsmile.dental"),
   title: "BrightSmile Dental | Gentle Care for Your Smile",
   description:
     "Modern dental clinic offering comprehensive dental services. Book your appointment online or call us today for a brighter, healthier smile.",
@@ -25,15 +26,32 @@ export const metadata: Metadata = {
     "cosmetic dentistry",
     "teeth whitening",
     "oral health",
+    "BrightSmile Dental",
   ],
   icons: {
     icon: "/dental-logo.png",
   },
   openGraph: {
+    url: "/",
     title: "BrightSmile Dental | Gentle Care for Your Smile",
     description:
       "Modern dental clinic offering comprehensive dental services. Book your appointment today.",
+    siteName: "BrightSmile Dental",
+    locale: "en_IN",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BrightSmile Dental | Gentle Care for Your Smile",
+    description:
+      "Modern dental clinic offering comprehensive dental services. Book your appointment today.",
+  },
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 

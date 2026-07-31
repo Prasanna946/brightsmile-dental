@@ -256,8 +256,8 @@ function HeroSection({ onBookClick }: { onBookClick: () => void }) {
       </div>
 
       {/* Multi-layer gradient overlay for depth */}
-      <div className="absolute inset-0 bg-gradient-to-b from-sky-900/20 via-sky-800/10 to-slate-900/40" />
-      <div className="absolute inset-0 bg-gradient-to-r from-sky-800/25 via-transparent to-cyan-800/15" />
+      <div className="absolute inset-0 bg-gradient-to-b from-sky-900/35 via-sky-900/20 to-slate-900/55" />
+      <div className="absolute inset-0 bg-gradient-to-r from-sky-900/45 via-transparent to-cyan-900/30" />
 
       {/* Small floating spark particles */}
       <div className="hero-sparks z-[1]">

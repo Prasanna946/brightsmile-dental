@@ -234,74 +234,199 @@ function Navbar({ onBookClick }: { onBookClick: () => void }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Hero                                                               */
+/*  Hero — Full-screen 3D Immersive Background                          */
 /* ------------------------------------------------------------------ */
 
 function HeroSection({ onBookClick }: { onBookClick: () => void }) {
   return (
     <section
       id="home"
-      className="relative flex min-h-[100dvh] items-center overflow-hidden"
+      className="hero-3d-bg relative flex min-h-[100dvh] items-center overflow-hidden"
     >
-      {/* Background image */}
-      <Image
-        src="/dental-hero.png"
-        alt="Modern dental clinic interior"
-        fill
-        className="object-cover"
-        priority
-        sizes="100vw"
-      />
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-sky-900/80 via-sky-800/60 to-transparent" />
+      {/* 3D drifting background image */}
+      <div className="hero-bg-layer absolute inset-0">
+        <Image
+          src="/hero-3d.png"
+          alt="BrightSmile Dental — Modern 3D dental care environment"
+          fill
+          className="object-cover"
+          priority
+          sizes="100vw"
+        />
+      </div>
+
+      {/* Multi-layer gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
+      <div className="absolute inset-0 bg-gradient-to-r from-sky-950/70 via-transparent to-cyan-950/40" />
+
+      {/* Floating 3D orbs for depth perception */}
+      <div className="hero-orb hero-orb-1" />
+      <div className="hero-orb hero-orb-2" />
+      <div className="hero-orb hero-orb-3" />
+
+      {/* Particle grid overlay */}
+      <div className="hero-particles absolute inset-0 z-[1]" />
+
+      {/* Shimmer sweep effect */}
+      <div className="hero-shimmer z-[2]" />
 
       {/* Content */}
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-32 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="max-w-xl"
-        >
-          <span className="mb-4 inline-block rounded-full bg-white/15 px-4 py-1.5 text-xs font-semibold tracking-wider text-white/90 uppercase backdrop-blur-sm">
-            Accepting New Patients
-          </span>
-          <h1 className="mb-6 text-4xl leading-tight font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Your Smile Deserves{" "}
-            <span className="text-sky-300">Gentle Care</span>
-          </h1>
-          <p className="mb-8 max-w-md text-lg leading-relaxed text-white/80">
-            Modern dentistry in a warm, relaxing environment. From routine
-            checkups to complete smile makeovers — we&apos;re here for you.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              size="lg"
-              onClick={onBookClick}
-              className="rounded-full bg-white px-8 text-base font-semibold text-sky-700 shadow-xl hover:bg-sky-50"
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          {/* Left: Text content */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            {/* Badge */}
+            <motion.span
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="trust-badge trust-badge-glow mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-wider text-white/90 uppercase"
             >
-              Book Appointment
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-            <a
-              href={`tel:${CLINIC_PHONE_TEL}`}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-white/40 bg-white/10 px-6 py-3 text-base font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              Accepting New Patients
+            </motion.span>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1 }}
+              className="mb-6 text-4xl leading-[1.1] font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl"
             >
-              <Phone className="h-4 w-4" />
-              Call Now
-            </a>
-          </div>
-        </motion.div>
+              Your Smile
+              <br />
+              Deserves{" "}
+              <span className="bg-gradient-to-r from-sky-300 via-cyan-200 to-sky-300 bg-clip-text text-transparent">
+                Gentle Care
+              </span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.25 }}
+              className="mb-8 max-w-lg text-lg leading-relaxed text-white/75 sm:text-xl"
+            >
+              Modern dentistry powered by 3D imaging and AI-assisted diagnostics.
+              Experience pain-free, precision dental care in a relaxing environment.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="flex flex-wrap gap-3"
+            >
+              <Button
+                size="lg"
+                onClick={onBookClick}
+                className="group relative overflow-hidden rounded-full bg-white px-8 text-base font-semibold text-sky-700 shadow-2xl shadow-sky-900/20 transition-all hover:shadow-3xl hover:shadow-sky-800/30 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <span className="relative z-10 flex items-center">
+                  Book Appointment
+                  <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </span>
+              </Button>
+              <a
+                href={`tel:${CLINIC_PHONE_TEL}`}
+                className="hero-glass inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-semibold text-white transition-all hover:bg-white/15 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Phone className="h-4 w-4" />
+                Call Now
+              </a>
+            </motion.div>
+          </motion.div>
+
+          {/* Right: Glassmorphism trust card */}
+          <motion.div
+            initial={{ opacity: 0, x: 40, rotateY: -8 }}
+            animate={{ opacity: 1, x: 0, rotateY: 0 }}
+            transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+            className="hidden lg:block"
+          >
+            <div className="hero-glass rounded-3xl p-8">
+              {/* Rating row */}
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                  <Shield className="h-6 w-6 text-sky-300" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className="h-4 w-4 fill-amber-400 text-amber-400"
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-white/60">
+                    4.9 rating from 2,400+ reviews
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick stats */}
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { icon: Sparkles, label: "3D Imaging", value: "Advanced" },
+                  { icon: Heart, label: "Patients", value: "15,000+" },
+                  { icon: Shield, label: "Safety", value: "100%" },
+                  { icon: Stethoscope, label: "Experience", value: "20+ Years" },
+                ].map((stat, i) => (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
+                    className="trust-badge rounded-2xl p-4 text-center"
+                  >
+                    <stat.icon className="mx-auto mb-2 h-5 w-5 text-sky-300" />
+                    <p className="text-lg font-bold text-white">{stat.value}</p>
+                    <p className="text-xs text-white/50">{stat.label}</p>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Certification bar */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.9 }}
+                className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-white/5 py-3"
+              >
+                <Sparkles className="h-4 w-4 text-cyan-300" />
+                <span className="text-xs font-medium text-white/60">
+                  ISO 9001:2015 Certified &middot; NABH Accredited
+                </span>
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
       </div>
 
+      {/* Bottom gradient fade into next section */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--dental-bg)] to-transparent z-[3]" />
+
       {/* Scroll hint */}
-      <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2">
+      <div className="absolute bottom-10 left-1/2 z-10 -translate-x-1/2">
         <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="flex h-10 w-6 items-start justify-center rounded-full border-2 border-white/40 p-1"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.5 }}
         >
-          <div className="h-2 w-1 rounded-full bg-white/70" />
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="flex h-10 w-6 items-start justify-center rounded-full border-2 border-white/30 p-1"
+          >
+            <div className="h-2 w-1 rounded-full bg-white/60" />
+          </motion.div>
         </motion.div>
       </div>
     </section>

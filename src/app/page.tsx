@@ -23,6 +23,7 @@ import {
   Loader2,
   Share2,
   Link2,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1129,6 +1130,21 @@ function FloatingButtons() {
             className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-emerald-600 text-white shadow-xl transition-transform hover:scale-110 hover:bg-emerald-500 active:scale-95"
           >
             {copied ? <Check className="h-6 w-6" /> : <Share2 className="h-6 w-6" />}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 10 }}
+            transition={{ delay: 0.05 }}
+            onClick={() => window.open(`https://wa.me/916381871589?text=${encodeURIComponent("Hi BrightSmile Dental! I'd like to book an appointment.")}`, "_blank")}
+            role="link"
+            aria-label="Chat on WhatsApp"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && window.open(`https://wa.me/916381871589?text=${encodeURIComponent("Hi BrightSmile Dental! I'd like to book an appointment.")}`, "_blank")}
+            className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl transition-transform hover:scale-110 hover:bg-[#1ebe5d] active:scale-95"
+          >
+            <MessageCircle className="h-6 w-6" />
           </motion.div>
 
           <motion.div

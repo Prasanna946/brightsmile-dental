@@ -259,10 +259,37 @@ function HeroSection({ onBookClick }: { onBookClick: () => void }) {
       <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
       <div className="absolute inset-0 bg-gradient-to-r from-sky-950/70 via-transparent to-cyan-950/40" />
 
-      {/* Floating 3D orbs for depth perception */}
-      <div className="hero-orb hero-orb-1" />
-      <div className="hero-orb hero-orb-2" />
-      <div className="hero-orb hero-orb-3" />
+      {/* Small floating spark particles */}
+      <div className="hero-sparks z-[1]">
+        {[
+          { w: 3,  h: 3, top: "12%", left: "8%",  dur: 4.5, delay: 0,   color: "rgba(186,230,253,0.9)" },
+          { w: 2,  h: 2, top: "25%", left: "22%", dur: 6,   delay: 1.2, color: "rgba(125,211,252,0.8)" },
+          { w: 4,  h: 4, top: "18%", left: "55%", dur: 5,   delay: 0.6, color: "rgba(255,255,255,0.7)" },
+          { w: 2,  h: 2, top: "35%", left: "75%", dur: 7,   delay: 2,   color: "rgba(186,230,253,0.6)" },
+          { w: 3,  h: 3, top: "50%", left: "15%", dur: 5.5, delay: 0.8, color: "rgba(103,232,249,0.8)" },
+          { w: 2,  h: 2, top: "65%", left: "60%", dur: 6.5, delay: 1.8, color: "rgba(255,255,255,0.6)" },
+          { w: 3,  h: 3, top: "70%", left: "35%", dur: 4,   delay: 3,   color: "rgba(125,211,252,0.7)" },
+          { w: 2,  h: 2, top: "80%", left: "80%", dur: 5.8, delay: 0.4, color: "rgba(186,230,253,0.5)" },
+          { w: 3,  h: 3, top: "45%", left: "90%", dur: 4.8, delay: 2.5, color: "rgba(103,232,249,0.7)" },
+          { w: 2,  h: 2, top: "55%", left: "42%", dur: 7.2, delay: 1.5, color: "rgba(255,255,255,0.5)" },
+          { w: 4,  h: 4, top: "30%", left: "92%", dur: 5.2, delay: 0.9, color: "rgba(125,211,252,0.6)" },
+          { w: 2,  h: 2, top: "75%", left: "10%", dur: 6.2, delay: 3.2, color: "rgba(186,230,253,0.8)" },
+        ].map((s, i) => (
+          <div
+            key={i}
+            className="hero-spark"
+            style={{
+              width: s.w,
+              height: s.h,
+              top: s.top,
+              left: s.left,
+              background: s.color,
+              boxShadow: `0 0 ${s.w * 2}px ${s.color}`,
+              animation: `${i % 2 === 0 ? 'spark-float' : 'spark-float-alt'} ${s.dur}s ease-in-out ${s.delay}s infinite`,
+            }}
+          />
+        ))}
+      </div>
 
       {/* Particle grid overlay */}
       <div className="hero-particles absolute inset-0 z-[1]" />

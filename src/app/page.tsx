@@ -1081,17 +1081,15 @@ function FloatingButtons() {
       url: window.location.href,
     };
 
-    // Native Web Share API (mobile & some desktop)
     if (navigator.share) {
       try {
         await navigator.share(shareData);
         return;
       } catch {
-        // User cancelled or error — fall through to clipboard
+        // cancelled
       }
     }
 
-    // Fallback: copy to clipboard
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
@@ -1118,34 +1116,34 @@ function FloatingButtons() {
           exit={{ opacity: 0 }}
           className="fixed bottom-6 right-6 z-50 flex flex-col gap-3"
         >
-          {/* Share button */
-          <motion.button
+          <motion.div
             initial={{ opacity: 0, scale: 0.5, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.5, y: 10 }}
             transition={{ delay: 0.1 }}
             onClick={handleShare}
+            role="button"
             aria-label="Share this website"
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xl transition-transform hover:scale-110 hover:bg-emerald-500 active:scale-95"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && handleShare()}
+            className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-emerald-600 text-white shadow-xl transition-transform hover:scale-110 hover:bg-emerald-500 active:scale-95"
           >
-            {copied ? (
-              <Check className="h-6 w-6" />
-            ) : (
-              <Share2 className="h-6 w-6" />
-            )}
-          </motion.button>
+            {copied ? <Check className="h-6 w-6" /> : <Share2 className="h-6 w-6" />}
+          </motion.div>
 
-          {/* Call button */
-          <motion.a
+          <motion.div
             initial={{ opacity: 0, scale: 0.5, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.5, y: 10 }}
-            href={`tel:${CLINIC_PHONE_TEL}`}
+            role="link"
             aria-label="Call BrightSmile Dental"
-            className="phone-pulse flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-xl transition-transform hover:scale-110 active:scale-95"
+            tabIndex={0}
+            onClick={() => window.open(`tel:${CLINIC_PHONE_TEL}`)}
+            onKeyDown={(e) => e.key === "Enter" && window.open(`tel:${CLINIC_PHONE_TEL}`)}
+            className="phone-pulse flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-primary text-white shadow-xl transition-transform hover:scale-110 active:scale-95"
           >
             <Phone className="h-6 w-6" />
-          </motion.a>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -21,6 +21,8 @@ import {
   Send,
   X,
   Loader2,
+  Share2,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1058,11 +1060,13 @@ function ContactSection() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Floating Click-to-Call Button                                      */
+/*  Floating Action Buttons (Call + Share)                              */
 /* ------------------------------------------------------------------ */
 
-function FloatingCallButton() {
+function FloatingButtons() {
   const [visible, setVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 400);
@@ -1070,19 +1074,79 @@ function FloatingCallButton() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const handleShare = async () => {
+    const shareData = {
+      title: "BrightSmile Dental",
+      text: "Book your dental appointment at BrightSmile Dental — modern, gentle care for your smile!",
+      url: window.location.href,
+    };
+
+    // Native Web Share API (mobile & some desktop)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {
+        // User cancelled or error — fall through to clipboard
+      }
+    }
+
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      toast({
+        title: "Link copied!",
+        description: "Share this link with your friends & family.",
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({
+        title: "Could not copy",
+        description: "Please copy the URL from your browser address bar.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <AnimatePresence>
       {visible && (
-        <motion.a
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.5 }}
-          href={`tel:${CLINIC_PHONE_TEL}`}
-          aria-label="Call BrightSmile Dental"
-          className="phone-pulse fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-xl transition-transform hover:scale-110 active:scale-95"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed bottom-6 right-6 z-50 flex flex-col gap-3"
         >
-          <Phone className="h-6 w-6" />
-        </motion.a>
+          {/* Share button */
+          <motion.button
+            initial={{ opacity: 0, scale: 0.5, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 10 }}
+            transition={{ delay: 0.1 }}
+            onClick={handleShare}
+            aria-label="Share this website"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xl transition-transform hover:scale-110 hover:bg-emerald-500 active:scale-95"
+          >
+            {copied ? (
+              <Check className="h-6 w-6" />
+            ) : (
+              <Share2 className="h-6 w-6" />
+            )}
+          </motion.button>
+
+          {/* Call button */
+          <motion.a
+            initial={{ opacity: 0, scale: 0.5, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 10 }}
+            href={`tel:${CLINIC_PHONE_TEL}`}
+            aria-label="Call BrightSmile Dental"
+            className="phone-pulse flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-xl transition-transform hover:scale-110 active:scale-95"
+          >
+            <Phone className="h-6 w-6" />
+          </motion.a>
+        </motion.div>
       )}
     </AnimatePresence>
   );
@@ -1235,7 +1299,7 @@ export default function HomePage() {
         <ContactSection />
       </main>
       <Footer />
-      <FloatingCallButton />
+      <FloatingButtons />
     </div>
   );
 }

@@ -676,23 +676,11 @@ function AppointmentSection({
 
       setSubmitted(true);
 
-      if (data.emailSent) {
-        toast({
-          title: "Appointment requested!",
-          description: `We'll confirm your ${form.service} appointment shortly.`,
-        });
-      } else if (data.emailConfigured) {
-        toast({
-          title: "Appointment saved!",
-          description: "Email delivery failed, but we have your details. We'll call you to confirm.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Appointment saved!",
-          description: "We'll contact you shortly to confirm your " + form.service + " appointment.",
-        });
-      }
+      // Always show success — notifications sent in background
+      toast({
+        title: "Appointment requested!",
+        description: "We'll confirm your " + form.service + " appointment shortly.",
+      });
     } catch {
       toast({
         title: "Something went wrong",

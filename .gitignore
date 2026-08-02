@@ -68,3 +68,6 @@ server.log
 /examples/
 Caddyfile
 worklog.md
+/tests/
+/tool-results/
+/upload/

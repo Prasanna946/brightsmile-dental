@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// ─── Config (all optional — nothing crashes if missing) ───
 const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || "";
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
 const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "";
@@ -30,9 +28,9 @@ function validateBody(body: unknown): body is AppointmentBody {
   );
 }
 
-// ─── 1. Doctor Email via EmailJS ───
-async function sendDoctorEmail(body: AppointmentBody): Promise<{ ok: boolean; error: string }> {
-  if (!EMAILJS_PUBLIC_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !CLINIC_EMAIL) {
+// ─── Send email via EmailJS to any recipient ───
+async function sendEmailJS(toEmail: string, body: AppointmentBody): Promise<{ ok: boolean; error: string }> {
+  if (!EMAILJS_PUBLIC_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID) {
     return { ok: false, error: "Missing EmailJS config" };
   }
   try {
@@ -44,7 +42,7 @@ async function sendDoctorEmail(body: AppointmentBody): Promise<{ ok: boolean; er
         template_id: EMAILJS_TEMPLATE_ID,
         user_id: EMAILJS_PUBLIC_KEY,
         template_params: {
-          to_email: CLINIC_EMAIL,
+          to_email: toEmail,
           from_name: body.name,
           from_phone: body.phone,
           from_email: body.email,
@@ -64,39 +62,7 @@ async function sendDoctorEmail(body: AppointmentBody): Promise<{ ok: boolean; er
   }
 }
 
-// ─── 2. Patient Email via Resend ───
-async function sendPatientEmail(body: AppointmentBody): Promise<{ ok: boolean; error: string }> {
-  if (!RESEND_API_KEY) {
-    return { ok: false, error: "Missing RESEND_API_KEY" };
-  }
-  try {
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f1f5f9"><div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);padding:32px 24px;text-align:center"><div style="font-size:28px;margin-bottom:8px">&#x1F9B7;</div><h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700">Appointment Received!</h1><p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px">We will contact you shortly to confirm</p></div><div style="padding:24px"><div style="background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:16px"><p style="margin:0 0 4px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Service</p><p style="margin:0 0 16px;color:#0f172a;font-size:16px;font-weight:700">${body.service}</p>${body.preferredDate ? `<p style="margin:0 0 4px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Preferred Date</p><p style="margin:0 0 16px;color:#0f172a;font-size:16px;font-weight:700">${body.preferredDate}</p>` : ""}<p style="margin:0 0 4px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Patient</p><p style="margin:0;color:#0f172a;font-size:16px;font-weight:700">${body.name}</p></div><div style="text-align:center;padding-top:8px;border-top:1px solid #e2e8f0"><p style="margin:0 0 4px;color:#64748b;font-size:13px">For urgent queries, call us</p><p style="margin:0;font-size:18px;font-weight:700;color:#0284c7">+91 63818 71589</p></div></div><div style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e2e8f0"><p style="margin:0;font-size:12px;color:#94a3b8">BrightSmile Dental &mdash; Your smile, our priority.</p></div></div></body></html>`;
-
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + RESEND_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "BrightSmile Dental <onboarding@resend.dev>",
-        to: [body.email],
-        subject: "Appointment Confirmed - " + body.service + " | BrightSmile Dental",
-        html: html,
-      }),
-    });
-
-    const text = await res.text();
-    if (!res.ok) {
-      return { ok: false, error: "Resend " + res.status + ": " + text };
-    }
-    return { ok: true, error: "" };
-  } catch (err) {
-    return { ok: false, error: String(err) };
-  }
-}
-
-// ─── 3. WhatsApp via Twilio ───
+// ─── WhatsApp via Twilio ───
 async function sendWhatsapp(body: AppointmentBody): Promise<{ clinic: boolean; patient: boolean }> {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_WHATSAPP_NUMBER) {
     return { clinic: false, patient: false };
@@ -149,10 +115,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const doctorResult = await sendDoctorEmail(body);
-    const patientResult = await sendPatientEmail(body);
+    // Send Doctor Email via EmailJS
+    const doctorResult = await sendEmailJS(CLINIC_EMAIL, body);
+
+    // Send Patient Email via EmailJS (same service, different recipient)
+    const patientResult = await sendEmailJS(body.email, body);
+
+    // Send WhatsApp (may fail in sandbox, that is OK)
     const whatsappResult = await sendWhatsapp(body);
 
+    // Try to save to DB (optional, fails silently on Vercel)
     let dbSaved = false;
     try {
       const { db } = await import("@/lib/db");
@@ -175,9 +147,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "Appointment request submitted successfully!",
       doctorEmailSent: doctorResult.ok,
-      doctorEmailError: doctorResult.error,
       patientEmailSent: patientResult.ok,
-      patientEmailError: patientResult.error,
       whatsappSent: whatsappResult,
       dbSaved: dbSaved,
     });

@@ -58,3 +58,13 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Dev artifacts & screenshots
+*.png
+!/public/*.png
+!/public/*.svg
+.zscripts/
+/download/
+/examples/
+Caddyfile
+worklog.md

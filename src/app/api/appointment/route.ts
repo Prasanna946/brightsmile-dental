@@ -96,7 +96,6 @@ async function sendWhatsapp(body: AppointmentBody): Promise<{ clinicSent: boolea
       `— BrightSmile Dental Team ❤️`;
 
     // Build patient WhatsApp number from the phone field
-    // phone comes as "+91 9876543210" — strip "+91 " prefix to get digits, then add whatsapp:+91
     const digits = body.phone.replace(/[^0-9]/g, "");
     const patientWhatsapp = `whatsapp:+${digits}`;
 
@@ -154,35 +153,52 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Save to database
-    const appointment = await db.appointment.create({
-      data: {
-        name: body.name.trim(),
-        phone: body.phone.trim(),
-        email: body.email.trim(),
-        service: body.service.trim(),
-        preferredDate: body.preferredDate?.trim() || null,
-        message: body.message?.trim() || null,
-      },
-    });
-
-    // 2. Send email + WhatsApp (clinic + patient) in parallel
+    // 1. ALWAYS send email + WhatsApp first (these are critical for the clinic)
     const [emailSent, whatsappResult] = await Promise.all([
       sendEmail(body),
       sendWhatsapp(body),
     ]);
 
+    // 2. Try to save to database (optional — fails silently on Vercel read-only filesystem)
+    let dbSaved = false;
+    try {
+      const appointment = await db.appointment.create({
+        data: {
+          name: body.name.trim(),
+          phone: body.phone.trim(),
+          email: body.email.trim(),
+          service: body.service.trim(),
+          preferredDate: body.preferredDate?.trim() || null,
+          message: body.message?.trim() || null,
+        },
+      });
+      dbSaved = true;
+      return NextResponse.json({
+        success: true,
+        appointment: {
+          id: appointment.id,
+          name: appointment.name,
+          service: appointment.service,
+          createdAt: appointment.createdAt,
+        },
+        emailSent,
+        whatsappSentToClinic: whatsappResult.clinicSent,
+        whatsappSentToPatient: whatsappResult.patientSent,
+        dbSaved: true,
+        emailConfigured: isEmailConfigured,
+        whatsappConfigured: isWhatsappConfigured,
+      });
+    } catch (dbErr) {
+      console.error("[DB] Save failed (non-critical):", dbErr);
+    }
+
+    // 3. Return success even if DB failed — email/WhatsApp already sent
     return NextResponse.json({
       success: true,
-      appointment: {
-        id: appointment.id,
-        name: appointment.name,
-        service: appointment.service,
-        createdAt: appointment.createdAt,
-      },
       emailSent,
       whatsappSentToClinic: whatsappResult.clinicSent,
       whatsappSentToPatient: whatsappResult.patientSent,
+      dbSaved: false,
       emailConfigured: isEmailConfigured,
       whatsappConfigured: isWhatsappConfigured,
     });
@@ -196,9 +212,14 @@ export async function POST(req: NextRequest) {
 
 // List recent appointments (for clinic staff)
 export async function GET() {
-  const appointments = await db.appointment.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
-  return NextResponse.json({ appointments });
+  try {
+    const appointments = await db.appointment.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+    return NextResponse.json({ appointments });
+  } catch (err) {
+    console.error("[DB] List failed:", err);
+    return NextResponse.json({ appointments: [], dbError: true });
+  }
 }

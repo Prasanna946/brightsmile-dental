@@ -4,6 +4,8 @@ const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || "";
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
 const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "";
@@ -34,15 +36,16 @@ const isEmailConfigured =
   EMAILJS_SERVICE_ID.length > 0 && !EMAILJS_SERVICE_ID.includes("YOUR_") &&
   EMAILJS_TEMPLATE_ID.length > 0 && !EMAILJS_TEMPLATE_ID.includes("YOUR_");
 
+const isResendConfigured = RESEND_API_KEY.length > 0 && !RESEND_API_KEY.includes("YOUR_");
+
 const isWhatsappConfigured =
   TWILIO_ACCOUNT_SID.length > 0 && !TWILIO_ACCOUNT_SID.includes("YOUR_") &&
   TWILIO_AUTH_TOKEN.length > 0 && !TWILIO_AUTH_TOKEN.includes("YOUR_") &&
   TWILIO_WHATSAPP_NUMBER.length > 0 && !TWILIO_WHATSAPP_NUMBER.includes("YOUR_");
 
-// Sends ONE email: To = doctor, BCC = patient
-// BCC approach prevents spam filtering on patient's email provider
-async function sendAppointmentEmail(body: AppointmentBody): Promise<boolean> {
-  if (!isEmailConfigured) return false;
+// Doctor notification via EmailJS (already working)
+async function sendDoctorEmail(body: AppointmentBody): Promise<boolean> {
+  if (!isEmailConfigured || !CLINIC_EMAIL) return false;
   try {
     const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
@@ -53,8 +56,6 @@ async function sendAppointmentEmail(body: AppointmentBody): Promise<boolean> {
         user_id: EMAILJS_PUBLIC_KEY,
         template_params: {
           to_email: CLINIC_EMAIL,
-          to_name: "Dr. Prasanna",
-          patient_email: body.email,
           from_name: body.name,
           from_phone: body.phone,
           from_email: body.email,
@@ -64,12 +65,70 @@ async function sendAppointmentEmail(body: AppointmentBody): Promise<boolean> {
         },
       }),
     });
+    if (!res.ok) console.error("[EmailJS/Doctor] Failed:", res.status, await res.text());
+    return res.ok;
+  } catch (err) {
+    console.error("[EmailJS/Doctor] Error:", err);
+    return false;
+  }
+}
+
+// Patient notification via Resend (bulletproof deliverability)
+async function sendPatientEmail(body: AppointmentBody): Promise<boolean> {
+  if (!isResendConfigured) return false;
+  try {
+    const html = `
+      <div style="max-width:480px;margin:0 auto;font-family:'Segoe UI',system-ui,sans-serif;color:#1e293b">
+        <div style="text-align:center;padding:32px 0 16px">
+          <img src="https://brightsmile-dental-two.vercel.app/dental-logo.png" alt="BrightSmile Dental" style="width:48px;height:48px;border-radius:50%" />
+          <h1 style="margin:12px 0 4px;font-size:22px;font-weight:700;color:#0f172a">Appointment Request Received!</h1>
+          <p style="margin:0;color:#64748b;font-size:14px">We'll contact you shortly to confirm</p>
+        </div>
+        <div style="background:#f8fafc;border-radius:12px;padding:24px;margin:20px 0">
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+            <tr>
+              <td style="padding:8px 0;color:#64748b;font-weight:500;width:100px">Service</td>
+              <td style="padding:8px 0;font-weight:600">${body.service}</td>
+            </tr>
+            ${body.preferredDate ? `
+            <tr>
+              <td style="padding:8px 0;color:#64748b;font-weight:500">Preferred Date</td>
+              <td style="padding:8px 0;font-weight:600">${body.preferredDate}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding:8px 0;color:#64748b;font-weight:500">Phone</td>
+              <td style="padding:8px 0;font-weight:600">${body.phone}</td>
+            </tr>
+          </table>
+        </div>
+        <div style="text-align:center;padding:16px 0 32px">
+          <p style="font-size:13px;color:#94a3b8;margin:0 0 8px">For urgent queries, call us at</p>
+          <a href="tel:+916381871589" style="font-size:16px;font-weight:700;color:#0284c7;text-decoration:none">+91 63818 71589</a>
+          <p style="font-size:12px;color:#cbd5e1;margin:20px 0 0">BrightSmile Dental &mdash; Your smile, our priority.</p>
+        </div>
+      </div>
+    `;
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + RESEND_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "BrightSmile Dental <onboarding@resend.dev>",
+        to: body.email,
+        subject: "Appointment Confirmed - " + body.service + " | BrightSmile Dental",
+        html: html,
+      }),
+    });
     if (!res.ok) {
-      console.error("[EmailJS] Failed:", res.status, await res.text());
+      const errText = await res.text();
+      console.error("[Resend/Patient] Failed:", res.status, errText);
     }
     return res.ok;
   } catch (err) {
-    console.error("[EmailJS] Error:", err);
+    console.error("[Resend/Patient] Error:", err);
     return false;
   }
 }
@@ -155,9 +214,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Send email (doctor + patient via BCC) and WhatsApp in parallel
-    const [emailSent, whatsappResult] = await Promise.all([
-      sendAppointmentEmail(body),
+    // Send all notifications in parallel
+    const [doctorEmailSent, patientEmailSent, whatsappResult] = await Promise.all([
+      sendDoctorEmail(body),
+      sendPatientEmail(body),
       sendWhatsapp(body),
     ]);
 
@@ -182,11 +242,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      emailSent,
+      emailSentToDoctor: doctorEmailSent,
+      emailSentToPatient: patientEmailSent,
       whatsappSentToClinic: whatsappResult.clinicSent,
       whatsappSentToPatient: whatsappResult.patientSent,
       dbSaved,
       emailConfigured: isEmailConfigured,
+      resendConfigured: isResendConfigured,
       whatsappConfigured: isWhatsappConfigured,
     });
   } catch (err) {

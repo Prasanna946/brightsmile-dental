@@ -39,8 +39,10 @@ const isWhatsappConfigured =
   TWILIO_AUTH_TOKEN.length > 0 && !TWILIO_AUTH_TOKEN.includes("YOUR_") &&
   TWILIO_WHATSAPP_NUMBER.length > 0 && !TWILIO_WHATSAPP_NUMBER.includes("YOUR_");
 
-async function sendEmailJS(toEmail: string, body: AppointmentBody): Promise<boolean> {
-  if (!isEmailConfigured || !toEmail) return false;
+// Sends ONE email: To = doctor, BCC = patient
+// BCC approach prevents spam filtering on patient's email provider
+async function sendAppointmentEmail(body: AppointmentBody): Promise<boolean> {
+  if (!isEmailConfigured) return false;
   try {
     const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
@@ -50,7 +52,9 @@ async function sendEmailJS(toEmail: string, body: AppointmentBody): Promise<bool
         template_id: EMAILJS_TEMPLATE_ID,
         user_id: EMAILJS_PUBLIC_KEY,
         template_params: {
-          to_email: toEmail,
+          to_email: CLINIC_EMAIL,
+          to_name: "Dr. Prasanna",
+          patient_email: body.email,
           from_name: body.name,
           from_phone: body.phone,
           from_email: body.email,
@@ -61,27 +65,19 @@ async function sendEmailJS(toEmail: string, body: AppointmentBody): Promise<bool
       }),
     });
     if (!res.ok) {
-      console.error("[EmailJS] Failed to send to " + toEmail + ":", res.status, await res.text());
+      console.error("[EmailJS] Failed:", res.status, await res.text());
     }
     return res.ok;
   } catch (err) {
-    console.error("[EmailJS] Error sending to " + toEmail + ":", err);
+    console.error("[EmailJS] Error:", err);
     return false;
   }
-}
-
-async function sendEmailNotifications(body: AppointmentBody): Promise<{ patientSent: boolean; clinicSent: boolean }> {
-  const [clinicSent, patientSent] = await Promise.all([
-    sendEmailJS(CLINIC_EMAIL, body),
-    sendEmailJS(body.email, body),
-  ]);
-  return { patientSent, clinicSent };
 }
 
 async function sendWhatsapp(body: AppointmentBody): Promise<{ clinicSent: boolean; patientSent: boolean }> {
   if (!isWhatsappConfigured) return { clinicSent: false, patientSent: false };
   try {
-    const encoded = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
+    const encoded = Buffer.from(TWILIO_ACCOUNT_SID + ":" + TWILIO_AUTH_TOKEN).toString("base64");
 
     const clinicMsg =
       "\u{1F9B7} *BrightSmile Dental \u2014 New Appointment*\n\n" +
@@ -159,13 +155,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Send ALL notifications in parallel (email to patient + clinic, WhatsApp to patient + clinic)
-    const [emailResult, whatsappResult] = await Promise.all([
-      sendEmailNotifications(body),
+    // Send email (doctor + patient via BCC) and WhatsApp in parallel
+    const [emailSent, whatsappResult] = await Promise.all([
+      sendAppointmentEmail(body),
       sendWhatsapp(body),
     ]);
 
-    // 2. Try to save to database (optional — uses dynamic import, never crashes)
+    // Try to save to database (optional — dynamic import, never crashes)
     let dbSaved = false;
     try {
       const { db } = await import("@/lib/db");
@@ -186,8 +182,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      emailSentToPatient: emailResult.patientSent,
-      emailSentToClinic: emailResult.clinicSent,
+      emailSent,
       whatsappSentToClinic: whatsappResult.clinicSent,
       whatsappSentToPatient: whatsappResult.patientSent,
       dbSaved,

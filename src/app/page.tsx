@@ -338,7 +338,7 @@ function HeroSection({ onBookClick }: { onBookClick: () => void }) {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.25 }}
-              className="mb-8 max-w-lg text-lg leading-relaxed text-white/75 sm:text-xl"
+              className="mb-8 max-w-lg text-sm leading-relaxed text-white/75 sm:text-base"
             >
               Modern dentistry powered by 3D imaging and AI-assisted diagnostics.
               Experience pain-free, precision dental care in a relaxing environment.

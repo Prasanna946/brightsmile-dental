@@ -324,7 +324,7 @@ function HeroSection({ onBookClick }: { onBookClick: () => void }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.1 }}
-              className="mb-6 text-4xl leading-[1.1] font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl"
+              className="mb-6 text-5xl leading-[1.08] font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-8xl"
             >
               Your Smile
               <br />

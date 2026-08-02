@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// ─── Config (all optional — nothing crashes if missing) ───
 const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || "";
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
 const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
-
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "";
-const CLINIC_WHATSAPP = process.env.CLINIC_WHATSAPP_NUMBER || "whatsapp:+916381871589";
+const CLINIC_WHATSAPP = process.env.CLINIC_WHATSAPP_NUMBER || "";
 const CLINIC_EMAIL = process.env.CLINIC_EMAIL || "";
 
 interface AppointmentBody {
@@ -31,21 +30,9 @@ function validateBody(body: unknown): body is AppointmentBody {
   );
 }
 
-const isEmailConfigured =
-  EMAILJS_PUBLIC_KEY.length > 0 && !EMAILJS_PUBLIC_KEY.includes("YOUR_") &&
-  EMAILJS_SERVICE_ID.length > 0 && !EMAILJS_SERVICE_ID.includes("YOUR_") &&
-  EMAILJS_TEMPLATE_ID.length > 0 && !EMAILJS_TEMPLATE_ID.includes("YOUR_");
-
-const isResendConfigured = RESEND_API_KEY.length > 0 && !RESEND_API_KEY.includes("YOUR_");
-
-const isWhatsappConfigured =
-  TWILIO_ACCOUNT_SID.length > 0 && !TWILIO_ACCOUNT_SID.includes("YOUR_") &&
-  TWILIO_AUTH_TOKEN.length > 0 && !TWILIO_AUTH_TOKEN.includes("YOUR_") &&
-  TWILIO_WHATSAPP_NUMBER.length > 0 && !TWILIO_WHATSAPP_NUMBER.includes("YOUR_");
-
-// Doctor notification via EmailJS (already working)
+// ─── 1. Doctor Email via EmailJS (WORKING - do not change) ───
 async function sendDoctorEmail(body: AppointmentBody): Promise<boolean> {
-  if (!isEmailConfigured || !CLINIC_EMAIL) return false;
+  if (!EMAILJS_PUBLIC_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !CLINIC_EMAIL) return false;
   try {
     const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
@@ -65,49 +52,51 @@ async function sendDoctorEmail(body: AppointmentBody): Promise<boolean> {
         },
       }),
     });
-    if (!res.ok) console.error("[EmailJS/Doctor] Failed:", res.status, await res.text());
+    if (!res.ok) console.error("[DoctorEmail] EmailJS failed:", res.status);
     return res.ok;
   } catch (err) {
-    console.error("[EmailJS/Doctor] Error:", err);
+    console.error("[DoctorEmail] Error:", err);
     return false;
   }
 }
 
-// Patient notification via Resend (bulletproof deliverability)
+// ─── 2. Patient Email via Resend (bulletproof) ───
 async function sendPatientEmail(body: AppointmentBody): Promise<boolean> {
-  if (!isResendConfigured) return false;
+  if (!RESEND_API_KEY) return false;
   try {
     const html = `
-      <div style="max-width:480px;margin:0 auto;font-family:'Segoe UI',system-ui,sans-serif;color:#1e293b">
-        <div style="text-align:center;padding:32px 0 16px">
-          <img src="https://brightsmile-dental-two.vercel.app/dental-logo.png" alt="BrightSmile Dental" style="width:48px;height:48px;border-radius:50%" />
-          <h1 style="margin:12px 0 4px;font-size:22px;font-weight:700;color:#0f172a">Appointment Request Received!</h1>
-          <p style="margin:0;color:#64748b;font-size:14px">We'll contact you shortly to confirm</p>
-        </div>
-        <div style="background:#f8fafc;border-radius:12px;padding:24px;margin:20px 0">
-          <table style="width:100%;border-collapse:collapse;font-size:14px">
-            <tr>
-              <td style="padding:8px 0;color:#64748b;font-weight:500;width:100px">Service</td>
-              <td style="padding:8px 0;font-weight:600">${body.service}</td>
-            </tr>
-            ${body.preferredDate ? `
-            <tr>
-              <td style="padding:8px 0;color:#64748b;font-weight:500">Preferred Date</td>
-              <td style="padding:8px 0;font-weight:600">${body.preferredDate}</td>
-            </tr>` : ''}
-            <tr>
-              <td style="padding:8px 0;color:#64748b;font-weight:500">Phone</td>
-              <td style="padding:8px 0;font-weight:600">${body.phone}</td>
-            </tr>
-          </table>
-        </div>
-        <div style="text-align:center;padding:16px 0 32px">
-          <p style="font-size:13px;color:#94a3b8;margin:0 0 8px">For urgent queries, call us at</p>
-          <a href="tel:+916381871589" style="font-size:16px;font-weight:700;color:#0284c7;text-decoration:none">+91 63818 71589</a>
-          <p style="font-size:12px;color:#cbd5e1;margin:20px 0 0">BrightSmile Dental &mdash; Your smile, our priority.</p>
-        </div>
-      </div>
-    `;
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9">
+<div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+  <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);padding:32px 24px;text-align:center">
+    <div style="font-size:28px;margin-bottom:8px">🦷</div>
+    <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700">Appointment Received!</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px">We will contact you shortly to confirm</p>
+  </div>
+  <div style="padding:24px">
+    <div style="background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:16px">
+      <p style="margin:0 0 4px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Service</p>
+      <p style="margin:0 0 16px;color:#0f172a;font-size:16px;font-weight:700">${body.service}</p>
+      ${body.preferredDate ? `
+      <p style="margin:0 0 4px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Preferred Date</p>
+      <p style="margin:0 0 16px;color:#0f172a;font-size:16px;font-weight:700">${body.preferredDate}</p>
+      ` : ""}
+      <p style="margin:0 0 4px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600">Patient</p>
+      <p style="margin:0;color:#0f172a;font-size:16px;font-weight:700">${body.name}</p>
+    </div>
+    <div style="text-align:center;padding-top:8px;border-top:1px solid #e2e8f0">
+      <p style="margin:0 0 4px;color:#64748b;font-size:13px">For urgent queries, call us</p>
+      <p style="margin:0;font-size:18px;font-weight:700;color:#0284c7">+91 63818 71589</p>
+    </div>
+  </div>
+  <div style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e2e8f0">
+    <p style="margin:0;font-size:12px;color:#94a3b8">BrightSmile Dental &mdash; Your smile, our priority.</p>
+  </div>
+</div>
+</body>
+</html>`;
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -117,29 +106,36 @@ async function sendPatientEmail(body: AppointmentBody): Promise<boolean> {
       },
       body: JSON.stringify({
         from: "BrightSmile Dental <onboarding@resend.dev>",
-        to: body.email,
+        to: [body.email],
         subject: "Appointment Confirmed - " + body.service + " | BrightSmile Dental",
         html: html,
       }),
     });
+
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("[Resend/Patient] Failed:", res.status, errText);
+      const errBody = await res.text();
+      console.error("[PatientEmail] Resend failed:", res.status, errBody);
+      return false;
     }
-    return res.ok;
+
+    const data = await res.json();
+    console.log("[PatientEmail] Sent successfully, ID:", data.id);
+    return true;
   } catch (err) {
-    console.error("[Resend/Patient] Error:", err);
+    console.error("[PatientEmail] Error:", err);
     return false;
   }
 }
 
-async function sendWhatsapp(body: AppointmentBody): Promise<{ clinicSent: boolean; patientSent: boolean }> {
-  if (!isWhatsappConfigured) return { clinicSent: false, patientSent: false };
+// ─── 3. WhatsApp via Twilio (requires Business API for production) ───
+async function sendWhatsapp(body: AppointmentBody): Promise<{ clinic: boolean; patient: boolean }> {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_WHATSAPP_NUMBER) {
+    return { clinic: false, patient: false };
+  }
   try {
-    const encoded = Buffer.from(TWILIO_ACCOUNT_SID + ":" + TWILIO_AUTH_TOKEN).toString("base64");
-
+    const auth = Buffer.from(TWILIO_ACCOUNT_SID + ":" + TWILIO_AUTH_TOKEN).toString("base64");
     const clinicMsg =
-      "\u{1F9B7} *BrightSmile Dental \u2014 New Appointment*\n\n" +
+      "🦷 *BrightSmile Dental - New Appointment*\n\n" +
       "*Patient:* " + body.name + "\n" +
       "*Service:* " + body.service + "\n" +
       "*Phone:* " + body.phone + "\n" +
@@ -147,81 +143,57 @@ async function sendWhatsapp(body: AppointmentBody): Promise<{ clinicSent: boolea
       (body.preferredDate ? "*Date:* " + body.preferredDate + "\n" : "") +
       (body.message ? "*Notes:* " + body.message : "");
 
-    const patientMsg =
-      "Hi " + body.name + "! \u{1F44B}\n\n" +
-      "Thank you for choosing *BrightSmile Dental*! \u{1F9B7}\n\n" +
-      "We've received your appointment request:\n" +
-      "\u2022 *Service:* " + body.service + "\n" +
-      (body.preferredDate ? "\u2022 *Preferred Date:* " + body.preferredDate + "\n" : "") +
-      "\nOur team will contact you shortly to confirm.\n" +
-      "For urgent queries, call us at +91 63818 71589.\n\n" +
-      "\u2014 BrightSmile Dental Team \u2764\uFE0F";
-
     const digits = body.phone.replace(/[^0-9]/g, "");
-    const patientWhatsapp = "whatsapp:+" + digits;
+    const patientNumber = "whatsapp:+" + digits;
+
+    const sendOne = (to: string, msg: string) =>
+      fetch("https://api.twilio.com/2010-04-01/Accounts/" + TWILIO_ACCOUNT_SID + "/Messages.json", {
+        method: "POST",
+        headers: { Authorization: "Basic " + auth, "Content-Type": "application/x-www-form-urlencoded" },
+        body: [
+          "To=" + encodeURIComponent(to),
+          "From=" + encodeURIComponent(TWILIO_WHATSAPP_NUMBER),
+          "Body=" + encodeURIComponent(msg),
+        ].join("&"),
+      });
 
     const [clinicRes, patientRes] = await Promise.all([
-      fetch(
-        "https://api.twilio.com/2010-04-01/Accounts/" + TWILIO_ACCOUNT_SID + "/Messages.json",
-        {
-          method: "POST",
-          headers: {
-            Authorization: "Basic " + encoded,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: [
-            "To=" + encodeURIComponent(CLINIC_WHATSAPP),
-            "From=" + encodeURIComponent(TWILIO_WHATSAPP_NUMBER),
-            "Body=" + encodeURIComponent(clinicMsg),
-          ].join("&"),
-        }
-      ),
-      fetch(
-        "https://api.twilio.com/2010-04-01/Accounts/" + TWILIO_ACCOUNT_SID + "/Messages.json",
-        {
-          method: "POST",
-          headers: {
-            Authorization: "Basic " + encoded,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: [
-            "To=" + encodeURIComponent(patientWhatsapp),
-            "From=" + encodeURIComponent(TWILIO_WHATSAPP_NUMBER),
-            "Body=" + encodeURIComponent(patientMsg),
-          ].join("&"),
-        }
-      ),
+      CLINIC_WHATSAPP ? sendOne(CLINIC_WHATSAPP, clinicMsg) : Promise.resolve({ ok: false }),
+      sendOne(patientNumber, clinicMsg),
     ]);
 
-    if (!clinicRes.ok) console.error("[WhatsApp/Clinic] Failed:", clinicRes.status, await clinicRes.text());
-    if (!patientRes.ok) console.error("[WhatsApp/Patient] Failed:", patientRes.status, await patientRes.text());
+    if (!clinicRes.ok) console.error("[WhatsApp/Clinic] Failed:", clinicRes.status);
+    if (!patientRes.ok) console.error("[WhatsApp/Patient] Failed:", patientRes.status);
 
-    return { clinicSent: clinicRes.ok, patientSent: patientRes.ok };
+    return { clinic: clinicRes.ok, patient: patientRes.ok };
   } catch (err) {
     console.error("[WhatsApp] Error:", err);
-    return { clinicSent: false, patientSent: false };
+    return { clinic: false, patient: false };
   }
 }
 
+// ─── Main POST handler ───
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
     if (!validateBody(body)) {
       return NextResponse.json(
-        { error: "Please fill in all required fields (name, phone, email, service)." },
+        { error: "Please fill in all required fields." },
         { status: 400 }
       );
     }
 
-    // Send all notifications in parallel
-    const [doctorEmailSent, patientEmailSent, whatsappResult] = await Promise.all([
-      sendDoctorEmail(body),
-      sendPatientEmail(body),
-      sendWhatsapp(body),
-    ]);
+    // Step 1: Send Doctor Email (EmailJS - already working)
+    const doctorOk = await sendDoctorEmail(body);
 
-    // Try to save to database (optional — dynamic import, never crashes)
+    // Step 2: Send Patient Email (Resend)
+    const patientOk = await sendPatientEmail(body);
+
+    // Step 3: Send WhatsApp (Twilio - may fail in sandbox, that is OK)
+    const whatsappOk = await sendWhatsapp(body);
+
+    // Step 4: Try to save to DB (optional, fails silently on Vercel)
     let dbSaved = false;
     try {
       const { db } = await import("@/lib/db");
@@ -240,19 +212,17 @@ export async function POST(req: NextRequest) {
       console.error("[DB] Save skipped (non-critical):", dbErr);
     }
 
+    // ALWAYS return success - notifications are best-effort
     return NextResponse.json({
       success: true,
-      emailSentToDoctor: doctorEmailSent,
-      emailSentToPatient: patientEmailSent,
-      whatsappSentToClinic: whatsappResult.clinicSent,
-      whatsappSentToPatient: whatsappResult.patientSent,
-      dbSaved,
-      emailConfigured: isEmailConfigured,
-      resendConfigured: isResendConfigured,
-      whatsappConfigured: isWhatsappConfigured,
+      message: "Appointment request submitted successfully!",
+      doctorEmailSent: doctorOk,
+      patientEmailSent: patientOk,
+      whatsappSent: whatsappOk,
+      dbSaved: dbSaved,
     });
   } catch (err) {
-    console.error("[Appointment] Error:", err);
+    console.error("[Appointment] Fatal error:", err);
     return NextResponse.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 }

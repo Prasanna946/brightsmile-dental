@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 
 const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || "";
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
@@ -7,8 +6,9 @@ const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
-const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || ""; // e.g. whatsapp:+14155238886
+const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "";
 const CLINIC_WHATSAPP = process.env.CLINIC_WHATSAPP_NUMBER || "whatsapp:+916381871589";
+const CLINIC_EMAIL = process.env.CLINIC_EMAIL || "";
 
 interface AppointmentBody {
   name: string;
@@ -39,8 +39,8 @@ const isWhatsappConfigured =
   TWILIO_AUTH_TOKEN.length > 0 && !TWILIO_AUTH_TOKEN.includes("YOUR_") &&
   TWILIO_WHATSAPP_NUMBER.length > 0 && !TWILIO_WHATSAPP_NUMBER.includes("YOUR_");
 
-async function sendEmail(body: AppointmentBody): Promise<boolean> {
-  if (!isEmailConfigured) return false;
+async function sendEmailJS(toEmail: string, body: AppointmentBody): Promise<boolean> {
+  if (!isEmailConfigured || !toEmail) return false;
   try {
     const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
@@ -50,6 +50,7 @@ async function sendEmail(body: AppointmentBody): Promise<boolean> {
         template_id: EMAILJS_TEMPLATE_ID,
         user_id: EMAILJS_PUBLIC_KEY,
         template_params: {
+          to_email: toEmail,
           from_name: body.name,
           from_phone: body.phone,
           from_email: body.email,
@@ -60,13 +61,21 @@ async function sendEmail(body: AppointmentBody): Promise<boolean> {
       }),
     });
     if (!res.ok) {
-      console.error("[EmailJS] Failed:", res.status, await res.text());
+      console.error("[EmailJS] Failed to send to " + toEmail + ":", res.status, await res.text());
     }
     return res.ok;
   } catch (err) {
-    console.error("[EmailJS] Error:", err);
+    console.error("[EmailJS] Error sending to " + toEmail + ":", err);
     return false;
   }
+}
+
+async function sendEmailNotifications(body: AppointmentBody): Promise<{ patientSent: boolean; clinicSent: boolean }> {
+  const [clinicSent, patientSent] = await Promise.all([
+    sendEmailJS(CLINIC_EMAIL, body),
+    sendEmailJS(body.email, body),
+  ]);
+  return { patientSent, clinicSent };
 }
 
 async function sendWhatsapp(body: AppointmentBody): Promise<{ clinicSent: boolean; patientSent: boolean }> {
@@ -74,59 +83,56 @@ async function sendWhatsapp(body: AppointmentBody): Promise<{ clinicSent: boolea
   try {
     const encoded = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
 
-    // Message to clinic (detailed)
     const clinicMsg =
-      `🦷 *BrightSmile Dental — New Appointment*\n\n` +
-      `*Patient:* ${body.name}\n` +
-      `*Service:* ${body.service}\n` +
-      `*Phone:* ${body.phone}\n` +
-      `*Email:* ${body.email}\n` +
-      (body.preferredDate ? `*Date:* ${body.preferredDate}\n` : "") +
-      (body.message ? `*Notes:* ${body.message}` : "");
+      "\u{1F9B7} *BrightSmile Dental \u2014 New Appointment*\n\n" +
+      "*Patient:* " + body.name + "\n" +
+      "*Service:* " + body.service + "\n" +
+      "*Phone:* " + body.phone + "\n" +
+      "*Email:* " + body.email + "\n" +
+      (body.preferredDate ? "*Date:* " + body.preferredDate + "\n" : "") +
+      (body.message ? "*Notes:* " + body.message : "");
 
-    // Message to patient (friendly confirmation)
     const patientMsg =
-      `Hi ${body.name}! 👋\n\n` +
-      `Thank you for choosing *BrightSmile Dental*! 🦷\n\n` +
-      `We've received your appointment request:\n` +
-      `• *Service:* ${body.service}\n` +
-      (body.preferredDate ? `• *Preferred Date:* ${body.preferredDate}\n` : "") +
-      `\nOur team will contact you shortly to confirm.\n` +
-      `For urgent queries, call us at +91 63818 71589.\n\n` +
-      `— BrightSmile Dental Team ❤️`;
+      "Hi " + body.name + "! \u{1F44B}\n\n" +
+      "Thank you for choosing *BrightSmile Dental*! \u{1F9B7}\n\n" +
+      "We've received your appointment request:\n" +
+      "\u2022 *Service:* " + body.service + "\n" +
+      (body.preferredDate ? "\u2022 *Preferred Date:* " + body.preferredDate + "\n" : "") +
+      "\nOur team will contact you shortly to confirm.\n" +
+      "For urgent queries, call us at +91 63818 71589.\n\n" +
+      "\u2014 BrightSmile Dental Team \u2764\uFE0F";
 
-    // Build patient WhatsApp number from the phone field
     const digits = body.phone.replace(/[^0-9]/g, "");
-    const patientWhatsapp = `whatsapp:+${digits}`;
+    const patientWhatsapp = "whatsapp:+" + digits;
 
     const [clinicRes, patientRes] = await Promise.all([
       fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+        "https://api.twilio.com/2010-04-01/Accounts/" + TWILIO_ACCOUNT_SID + "/Messages.json",
         {
           method: "POST",
           headers: {
-            Authorization: `Basic ${encoded}`,
+            Authorization: "Basic " + encoded,
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: [
-            `To=${encodeURIComponent(CLINIC_WHATSAPP)}`,
-            `From=${encodeURIComponent(TWILIO_WHATSAPP_NUMBER)}`,
-            `Body=${encodeURIComponent(clinicMsg)}`,
+            "To=" + encodeURIComponent(CLINIC_WHATSAPP),
+            "From=" + encodeURIComponent(TWILIO_WHATSAPP_NUMBER),
+            "Body=" + encodeURIComponent(clinicMsg),
           ].join("&"),
         }
       ),
       fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+        "https://api.twilio.com/2010-04-01/Accounts/" + TWILIO_ACCOUNT_SID + "/Messages.json",
         {
           method: "POST",
           headers: {
-            Authorization: `Basic ${encoded}`,
+            Authorization: "Basic " + encoded,
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: [
-            `To=${encodeURIComponent(patientWhatsapp)}`,
-            `From=${encodeURIComponent(TWILIO_WHATSAPP_NUMBER)}`,
-            `Body=${encodeURIComponent(patientMsg)}`,
+            "To=" + encodeURIComponent(patientWhatsapp),
+            "From=" + encodeURIComponent(TWILIO_WHATSAPP_NUMBER),
+            "Body=" + encodeURIComponent(patientMsg),
           ].join("&"),
         }
       ),
@@ -153,16 +159,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. ALWAYS send email + WhatsApp first (these are critical for the clinic)
-    const [emailSent, whatsappResult] = await Promise.all([
-      sendEmail(body),
+    // 1. Send ALL notifications in parallel (email to patient + clinic, WhatsApp to patient + clinic)
+    const [emailResult, whatsappResult] = await Promise.all([
+      sendEmailNotifications(body),
       sendWhatsapp(body),
     ]);
 
-    // 2. Try to save to database (optional — fails silently on Vercel read-only filesystem)
+    // 2. Try to save to database (optional — uses dynamic import, never crashes)
     let dbSaved = false;
     try {
-      const appointment = await db.appointment.create({
+      const { db } = await import("@/lib/db");
+      await db.appointment.create({
         data: {
           name: body.name.trim(),
           phone: body.phone.trim(),
@@ -173,36 +180,22 @@ export async function POST(req: NextRequest) {
         },
       });
       dbSaved = true;
-      return NextResponse.json({
-        success: true,
-        appointment: {
-          id: appointment.id,
-          name: appointment.name,
-          service: appointment.service,
-          createdAt: appointment.createdAt,
-        },
-        emailSent,
-        whatsappSentToClinic: whatsappResult.clinicSent,
-        whatsappSentToPatient: whatsappResult.patientSent,
-        dbSaved: true,
-        emailConfigured: isEmailConfigured,
-        whatsappConfigured: isWhatsappConfigured,
-      });
     } catch (dbErr) {
-      console.error("[DB] Save failed (non-critical):", dbErr);
+      console.error("[DB] Save skipped (non-critical):", dbErr);
     }
 
-    // 3. Return success even if DB failed — email/WhatsApp already sent
     return NextResponse.json({
       success: true,
-      emailSent,
+      emailSentToPatient: emailResult.patientSent,
+      emailSentToClinic: emailResult.clinicSent,
       whatsappSentToClinic: whatsappResult.clinicSent,
       whatsappSentToPatient: whatsappResult.patientSent,
-      dbSaved: false,
+      dbSaved,
       emailConfigured: isEmailConfigured,
       whatsappConfigured: isWhatsappConfigured,
     });
-  } catch {
+  } catch (err) {
+    console.error("[Appointment] Error:", err);
     return NextResponse.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 }
@@ -210,9 +203,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// List recent appointments (for clinic staff)
 export async function GET() {
   try {
+    const { db } = await import("@/lib/db");
     const appointments = await db.appointment.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
